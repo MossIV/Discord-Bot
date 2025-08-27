@@ -1,6 +1,8 @@
 import discord
 import os
 from dotenv import load_dotenv
+import requests
+import json
 
 load_dotenv()
 
@@ -18,6 +20,11 @@ class MyClient(discord.Client):
 
         if message.content.startswith('$hello'):
             await message.channel.send('Hello World!')
+            
+    def get_meme():
+        response = requests.get('https://meme-api.com/gimme')
+        json_data = json.loads(response.text)
+        return json_data['url']
 
 intents = discord.Intents.default()
 intents.message_content = True
