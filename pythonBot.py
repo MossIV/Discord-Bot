@@ -25,6 +25,8 @@ def get_dad():
     json_data = response.json()
     return json_data['joke']
     
+def get_yeah_nah():
+    return ''
 
 class MyClient(discord.Client):
     async def on_ready(self):
@@ -39,7 +41,9 @@ class MyClient(discord.Client):
 
         if message.content.startswith('$dad'):
             await message.channel.send(get_dad())
-        
+            
+        if message.content.startswith('$yeahnah'):
+            await message.channel.send(get_yeah_nah())
 
 intents = discord.Intents.default()
 intents.message_content = True
