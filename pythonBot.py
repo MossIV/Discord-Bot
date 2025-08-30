@@ -46,7 +46,7 @@ class MyClient(discord.Client):
         if message.content.startswith('$dad'):
             await message.channel.send(get_dad())
 
-        if message.content.startswith('$yeahnah'):
+        if message.content.startswith('$yayornay'):
             answer_array = get_yeah_nah()
             await message.channel.send(answer_array[0])
             await message.channel.send(answer_array[1])
