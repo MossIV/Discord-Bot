@@ -26,7 +26,11 @@ def get_dad():
     return json_data['joke']
     
 def get_yeah_nah():
-    return ''
+    URL="https://yesno.wtf/api"
+    response = requests.get(URL)
+    json_data = response.json()
+    response_json = [json_data['answer'],json_data['image']]
+    return response_json
 
 class MyClient(discord.Client):
     async def on_ready(self):
@@ -41,9 +45,11 @@ class MyClient(discord.Client):
 
         if message.content.startswith('$dad'):
             await message.channel.send(get_dad())
-            
+
         if message.content.startswith('$yeahnah'):
-            await message.channel.send(get_yeah_nah())
+            answer_array = get_yeah_nah()
+            await message.channel.send(answer_array[0])
+            await message.channel.send(answer_array[1])
 
 intents = discord.Intents.default()
 intents.message_content = True
