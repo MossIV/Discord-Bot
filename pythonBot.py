@@ -66,6 +66,12 @@ class MyClient(discord.Client):
             else:
                 await message.channel.send(user.name+" is not in a voice channel!")
                 
+        if message.content.startswith('$leave'):
+            for voiceChannel in self.voice_clients:
+                if voiceChannel.guild == message.guild:
+                    await voiceChannel.disconnect() 
+                    await message.channel.send("Disconnected from voice channel at the request of my master "+message.author.name)
+                           
 intents = discord.Intents.default()
 intents.message_content = True
 
