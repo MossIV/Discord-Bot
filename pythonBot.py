@@ -32,6 +32,11 @@ def get_yeah_nah():
     response_json = [json_data['answer'],json_data['image']]
     return response_json
 
+async def join_channel(user):
+    currentChannel = user.voice
+    if currentChannel is not None:
+        await currentChannel.channel.connect()
+
 class MyClient(discord.Client):
     async def on_ready(self):
         print('Logged on as {0}!'.format(self.user))
@@ -39,7 +44,9 @@ class MyClient(discord.Client):
     async def on_message(self, message):
         if message.author == self.user:
             return
-
+        if message.content.startswith('!ping'):
+            await message.channel.send("pong!")
+        
         if message.content.startswith('$meme'):
             await message.channel.send(get_meme())
 
@@ -47,10 +54,18 @@ class MyClient(discord.Client):
             await message.channel.send(get_dad())
 
         if message.content.startswith('$yayornay'):
-            answer_array = get_yeah_nah()
-            await message.channel.send(answer_array[0])
-            await message.channel.send(answer_array[1])
-
+            answerArray = get_yeah_nah()
+            await message.channel.send(answerArray[0])
+            await message.channel.send(answerArray[1])
+            
+        if message.content.startswith('$join'):
+            user = message.author
+            currentChannel = user.voice
+            if currentChannel is not None:
+                await join_channel(user)
+            else:
+                await message.channel.send(user.name+" is not in a voice channel!")
+                
 intents = discord.Intents.default()
 intents.message_content = True
 
