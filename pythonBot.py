@@ -1,3 +1,4 @@
+import asyncio
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -10,6 +11,14 @@ import yt_dlp
 load_dotenv()
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+
+import logging
+
+queue = []
+
+# Per-guild async queues and player tasks
+guild_queues = {}
+player_tasks = {}
 
 def get_meme():
     response = requests.get('https://meme-api.com/gimme')
@@ -35,6 +44,77 @@ def get_yeah_nah():
     response_json = [json_data['answer'],json_data['image']]
     return response_json
 
+def add_to_queue(audio_url, audio_duration):
+    queue.insert(0,[audio_url, audio_duration])
+    return
+
+
+def get_from_queue():
+    if len(queue) > 0:
+        return queue[len(queue)-1]
+    else:
+        return None
+    
+
+def pop_queue():
+    if len(queue) > 0:
+        queue.pop()
+    return
+
+async def _ensure_guild_queue(guild_id: int):
+    if guild_id not in guild_queues:
+        guild_queues[guild_id] = asyncio.Queue()
+    return guild_queues[guild_id]
+
+async def _run_yt_dlp_info(url: str):
+    # Run blocking yt_dlp.extract_info in a thread to avoid blocking the event loop
+    def extract():
+        ydl_opts = {
+            'format': 'm4a/bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'm4a',
+            }],
+            'extractor-args': "youtube:player_client=default"
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title')}
+
+    return await asyncio.to_thread(extract)
+
+async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient):
+    # Start a background player loop per guild if not already running
+    if guild.id in player_tasks and not player_tasks[guild.id].done():
+        return
+
+    async def player_loop():
+        q = await _ensure_guild_queue(guild.id)
+        while True:
+            try:
+                item = await q.get()
+            except asyncio.CancelledError:
+                break
+
+            try:
+                vc = guild.voice_client
+                if vc is None:
+                    logging.warning(f"No voice client for guild {guild.id}, skipping playback")
+                    continue
+
+                source = discord.FFmpegPCMAudio(item['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+                vc.play(source)
+
+                # Wait for playback to finish without blocking the loop
+                while vc.is_playing() or vc.is_paused():
+                    await asyncio.sleep(1)
+
+            except Exception as e:
+                logging.exception('Error during playback')
+            finally:
+                q.task_done()
+
+    player_tasks[guild.id] = asyncio.create_task(player_loop())
 class MyClient(discord.Client):
     async def on_ready(self):
         await tree.sync()
@@ -92,25 +172,25 @@ async def play(interaction: discord.Interaction, url: str):
     if voice_client is None:
         await interaction.response.send_message("Bot is not connected to a voice channel.")
         return
-    await interaction.response.send_message(f'Now playing audio from: {url}')
-    
-    ydl_opts = {
-    'format': 'm4a/bestaudio/best',
-    'postprocessors': [{  # Extract audio using ffmpeg
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'm4a',
-    }],
-    'extractor-args': "youtube:player_client=default"
-    }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            audio_url = info['url']
-            
+    # Extract info using yt_dlp in a thread so we don't block the event loop
+    try:
+        info = await _run_yt_dlp_info(url)
+    except Exception:
+        logging.exception('Failed to extract info')
+        await interaction.response.send_message(f'Failed to retrieve info for: {url}')
+        return
 
-    if isinstance(voice_client, discord.VoiceClient) and voice_client.is_playing():
-        voice_client.stop()
-    voice_client.play(discord.FFmpegPCMAudio(audio_url, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'))
+    # Ensure guild queue exists and enqueue the track
+    q = await _ensure_guild_queue(interaction.guild.id)
+    await q.put(info)
+
+    # Start background player task for this guild if not running
+    await start_player_task_if_needed(interaction.guild, voice_client)
+
+    # Respond to user
+    title = info.get('title') or url
+    await interaction.response.send_message(f'Enqueued: {title}')
         
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
