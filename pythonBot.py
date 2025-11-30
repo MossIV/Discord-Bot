@@ -1,8 +1,11 @@
 import discord
+from discord.ext import commands
+from discord import app_commands
 import os
 from dotenv import load_dotenv
 import requests
 import json
+import yt_dlp
 
 load_dotenv()
 
@@ -39,24 +42,13 @@ async def join_channel(user):
 
 class MyClient(discord.Client):
     async def on_ready(self):
+        await tree.sync()
+        print('Tree synced')
         print('Logged on as {0}!'.format(self.user))
 
     async def on_message(self, message):
         if message.author == self.user:
             return
-        if message.content.startswith('!ping'):
-            await message.channel.send("pong!")
-        
-        if message.content.startswith('$meme'):
-            await message.channel.send(get_meme())
-
-        if message.content.startswith('$dad'):
-            await message.channel.send(get_dad())
-
-        if message.content.startswith('$yayornay'):
-            answerArray = get_yeah_nah()
-            await message.channel.send(answerArray[0])
-            await message.channel.send(answerArray[1])
             
         if message.content.startswith('$join'):
             user = message.author
@@ -68,14 +60,37 @@ class MyClient(discord.Client):
                 
         if message.content.startswith('$leave'):
             for voiceChannel in self.voice_clients:
-                if voiceChannel.guild == message.guild:
-                    await voiceChannel.disconnect() 
+                if getattr(voiceChannel, 'guild', None) == message.guild:
+                    await voiceChannel.disconnect(force=True)
                     await message.channel.send("Disconnected from voice channel at the request of my master "+message.author.name)
                            
 intents = discord.Intents.default()
 intents.message_content = True
 
 client = MyClient(intents=intents)
+
+
+
+tree = app_commands.CommandTree(client)
+
+@tree.command(name="meme", description="Sends a random meme")
+async def meme(interaction: discord.Interaction):
+    await interaction.response.send_message(get_meme())
+
+@tree.command(name="ping", description="Replies with pong!")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message("pong!")
+    
+@tree.command(name="dadjoke", description="Sends a random dad joke")
+async def dadjoke(interaction: discord.Interaction):
+    await interaction.response.send_message(get_dad())
+    
+@tree.command(name="yayornay", description="Sends a random yes or no with gif")
+async def yayornay(interaction: discord.Interaction):
+    answerArray = get_yeah_nah()
+    await interaction.response.send_message(answerArray[0])
+    await interaction.followup.send(answerArray[1])
+    
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
 client.run(DISCORD_TOKEN)
