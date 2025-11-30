@@ -76,4 +76,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 client = MyClient(intents=intents)
+if DISCORD_TOKEN is None:
+    raise ValueError("DISCORD_TOKEN environment variable is not set")
 client.run(DISCORD_TOKEN)
