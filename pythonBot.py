@@ -39,6 +39,9 @@ async def join_channel(user):
     currentChannel = user.voice
     if currentChannel is not None:
         await currentChannel.channel.connect()
+    else:
+        print(user.name+" is not in a voice channel!")
+        return
 
 class MyClient(discord.Client):
     async def on_ready(self):
@@ -90,7 +93,41 @@ async def yayornay(interaction: discord.Interaction):
     answerArray = get_yeah_nah()
     await interaction.response.send_message(answerArray[0])
     await interaction.followup.send(answerArray[1])
+
+@tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
+async def play(interaction: discord.Interaction, url: str):
+    user = interaction.user
+    # await join_channel(user)
+    currentChannel = user.voice
+    if currentChannel is not None:
+        voice_channel = currentChannel.channel
+        if interaction.guild.voice_client is None:
+            await voice_channel.connect()
+    voice_client = interaction.guild.voice_client
+
+    if voice_client is None:
+        await interaction.response.send_message("Bot is not connected to a voice channel.")
+        return
+    await interaction.response.send_message(f'Now playing audio from: {url}')
     
+    ydl_opts = {
+    'format': 'm4a/bestaudio/best',
+    'postprocessors': [{  # Extract audio using ffmpeg
+        'key': 'FFmpegExtractAudio',
+        'preferredcodec': 'm4a',
+    }],
+    'extractor-args': "youtube:player_client=default"
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            audio_url = info['url']
+            
+
+    if isinstance(voice_client, discord.VoiceClient) and voice_client.is_playing():
+        voice_client.stop()
+    voice_client.play(discord.FFmpegPCMAudio(audio_url, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'))
+        
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
 client.run(DISCORD_TOKEN)
