@@ -35,6 +35,14 @@ def get_yeah_nah():
     response_json = [json_data['answer'],json_data['image']]
     return response_json
 
+async def join_channel(user):
+    currentChannel = user.voice
+    if currentChannel is not None:
+        await currentChannel.channel.connect()
+    else:
+        print(user.name+" is not in a voice channel!")
+        return
+
 class MyClient(discord.Client):
     async def on_ready(self):
         await tree.sync()
