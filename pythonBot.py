@@ -168,9 +168,9 @@ async def play(interaction: discord.Interaction, url: str):
         if interaction.guild.voice_client is None:
             await voice_channel.connect()
     voice_client = interaction.guild.voice_client
-
+    await interaction.response.defer()  # Acknowledge the command to avoid timeout
     if voice_client is None:
-        await interaction.response.send_message("Bot is not connected to a voice channel.")
+        await interaction.followup.send("Bot is not connected to a voice channel.")
         return
 
     # Extract info using yt_dlp in a thread so we don't block the event loop
@@ -178,7 +178,7 @@ async def play(interaction: discord.Interaction, url: str):
         info = await _run_yt_dlp_info(url)
     except Exception:
         logging.exception('Failed to extract info')
-        await interaction.response.send_message(f'Failed to retrieve info for: {url}')
+        await interaction.followup.send(f'Failed to retrieve info for: {url}')
         return
 
     # Ensure guild queue exists and enqueue the track
@@ -190,7 +190,7 @@ async def play(interaction: discord.Interaction, url: str):
 
     # Respond to user
     title = info.get('title') or url
-    await interaction.response.send_message(f'Enqueued: {title}')
+    await interaction.followup.send(f'Enqueued: {title}\n{url}')
         
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
