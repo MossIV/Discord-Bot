@@ -172,6 +172,17 @@ async def yayornay(interaction: discord.Interaction):
     await interaction.response.send_message(answerArray[0])
     await interaction.followup.send(answerArray[1])
 
+@tree.command(name="skip", description="Skips the current audio track")
+async def skip(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client is None or not voice_client.is_playing():
+        await interaction.response.send_message("No audio is currently playing.")
+        return
+
+    voice_client.stop()
+    await interaction.response.send_message(f"Does this mean you want me to play the next track, {interaction.user.name} Onii Sama?")
+    return
+
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
 async def play(interaction: discord.Interaction, url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
