@@ -186,6 +186,31 @@ async def skip(interaction: discord.Interaction):
     await interaction.response.send_message(f"Does this mean you want me to play the next track, {interaction.user.name} Onii Sama?")
     return
 
+@tree.command(name="queue", description="Shows the current audio queue")
+async def show_queue(interaction: discord.Interaction):
+    q = await _ensure_guild_queue(interaction.guild.id)
+    if q.empty():
+        await interaction.response.send_message("The audio queue is currently empty.")
+        return
+
+    queue_list = []
+    temp_queue = asyncio.Queue()
+
+    while not q.empty():
+        item = await q.get()
+        queue_list.append(item.get('title', 'Unknown Title'))
+        await temp_queue.put(item)
+        q.task_done()
+        
+    # Restore the original queue
+    while not temp_queue.empty():
+        item = await temp_queue.get()
+        await q.put(item)
+        temp_queue.task_done()
+
+    queue_message = "Current Audio Queue waiting:\n" + "\n".join(f"{idx + 1}. {title}" for idx, title in enumerate(queue_list))
+    await interaction.response.send_message(queue_message)
+
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
 async def play(interaction: discord.Interaction, url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
