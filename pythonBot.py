@@ -1,4 +1,5 @@
 import asyncio
+import random
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -84,8 +85,9 @@ async def _run_yt_dlp_info(url: str):
     return await asyncio.to_thread(extract)
 
 async def startup(vc: discord.VoiceClient):
-    vc.play(discord.FFmpegPCMAudio("./joining voicelines/1.m4a"))
-    await asyncio.sleep(4)  # Give time for the first audio to start
+    startupVoices = ["./joining voicelines/1.m4a","./joining voicelines/2.m4a","./joining voicelines/3.m4a"]
+    choice = random.choice(startupVoices)
+    vc.play(discord.FFmpegPCMAudio(choice))
     return
 
 async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient):
