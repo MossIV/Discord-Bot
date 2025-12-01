@@ -135,12 +135,6 @@ class MyClient(discord.Client):
         if message.author == self.user:
             return
                 
-        if message.content.startswith('$leave'):
-            for voiceChannel in self.voice_clients:
-                if getattr(voiceChannel, 'guild', None) == message.guild:
-                    await voiceChannel.disconnect(force=True)
-                    await message.channel.send("Disconnected from voice channel at the request of my master "+message.author.name)
-                    
                     
                     
                     
@@ -171,6 +165,15 @@ async def yayornay(interaction: discord.Interaction):
     answerArray = get_yeah_nah()
     await interaction.response.send_message(answerArray[0])
     await interaction.followup.send(answerArray[1])
+
+@tree.command(name="leave", description="Disconnects the bot from the voice channel")
+async def leave(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client is not None:
+        await voice_client.disconnect()
+        await interaction.response.send_message(f"Disconnected from the voice channel, {interaction.user.name} Onii Sama.")
+    else:
+        await interaction.response.send_message("I am not connected to any voice channel, are you dumb?")
 
 @tree.command(name="skip", description="Skips the current audio track")
 async def skip(interaction: discord.Interaction):
