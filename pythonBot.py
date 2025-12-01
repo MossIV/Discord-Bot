@@ -83,6 +83,11 @@ async def _run_yt_dlp_info(url: str):
 
     return await asyncio.to_thread(extract)
 
+async def startup(vc: discord.VoiceClient):
+    vc.play(discord.FFmpegPCMAudio("./joining voicelines/1.m4a"))
+    await asyncio.sleep(4)  # Give time for the first audio to start
+    return
+
 async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient):
     # Start a background player loop per guild if not already running
     if guild.id in player_tasks and not player_tasks[guild.id].done():
@@ -115,6 +120,11 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                 q.task_done()
 
     player_tasks[guild.id] = asyncio.create_task(player_loop())
+    
+    
+    
+    
+    
 class MyClient(discord.Client):
     async def on_ready(self):
         await tree.sync()
@@ -130,6 +140,10 @@ class MyClient(discord.Client):
                 if getattr(voiceChannel, 'guild', None) == message.guild:
                     await voiceChannel.disconnect(force=True)
                     await message.channel.send("Disconnected from voice channel at the request of my master "+message.author.name)
+                    
+                    
+                    
+                    
                            
 intents = discord.Intents.default()
 intents.message_content = True
@@ -160,6 +174,7 @@ async def yayornay(interaction: discord.Interaction):
 
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
 async def play(interaction: discord.Interaction, url: str):
+    await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
     # await join_channel(user)
     currentChannel = user.voice
@@ -167,12 +182,15 @@ async def play(interaction: discord.Interaction, url: str):
         voice_channel = currentChannel.channel
         if interaction.guild.voice_client is None:
             await voice_channel.connect()
+            await startup(voice_channel.guild.voice_client)
     voice_client = interaction.guild.voice_client
-    await interaction.response.defer()  # Acknowledge the command to avoid timeout
     if voice_client is None:
         await interaction.followup.send("Bot is not connected to a voice channel.")
         return
-
+    
+    
+    
+     
     # Extract info using yt_dlp in a thread so we don't block the event loop
     try:
         info = await _run_yt_dlp_info(url)
@@ -190,7 +208,7 @@ async def play(interaction: discord.Interaction, url: str):
 
     # Respond to user
     title = info.get('title') or url
-    await interaction.followup.send(f'Enqueued: {title}\n{url}')
+    await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything\n{url}')
         
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
