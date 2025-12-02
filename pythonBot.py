@@ -238,7 +238,7 @@ async def show_queue(interaction: discord.Interaction):
     queue_message = "Current Audio Queue waiting:\n" + "\n".join(f"{idx + 1}. {title}" for idx, title in enumerate(queue_list))
     await interaction.response.send_message(queue_message)
 
-@tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel (playlists/mixes ignored by default; set play_first=True to play the first video)")
+@tree.command(name="play", description="Plays audio from a YouTube URL, playlists/mixes ignored by default")
 async def play(interaction: discord.Interaction, url: str, play_first: bool = False):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
@@ -261,7 +261,7 @@ async def play(interaction: discord.Interaction, url: str, play_first: bool = Fa
     query = parse_qs(parsed_url.query)
     list_ids = query.get('list')
     list_id = list_ids[0] if list_ids else None
-    is_mix_url = list_id is not None and list_id.upper().startswith('RD')
+    is_mix_url = list_id is not None and (list_id.upper().startswith('RD') or list_id.upper().startswith('PL'))
 
     # Extract info using yt_dlp in a thread so we don't block the event loop
     try:
