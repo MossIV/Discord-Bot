@@ -1,8 +1,6 @@
 import asyncio
 import random
 import discord
-from discord.ext import commands
-from discord import app_commands
 import os
 from dotenv import load_dotenv
 import requests
@@ -149,7 +147,7 @@ client = MyClient(intents=intents)
 
 
 
-tree = app_commands.CommandTree(client)
+tree = discord.app_commands.CommandTree(client)
 
 @tree.command(name="meme", description="Sends a random meme")
 async def meme(interaction: discord.Interaction):
