@@ -76,7 +76,8 @@ async def _run_yt_dlp_info(url: str):
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'm4a',
             }],
-            'extractor-args': "youtube:player_client=default"
+            'extractor-args': "youtube:player_client=default",
+            'noplaylist': True,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
