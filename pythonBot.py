@@ -225,6 +225,13 @@ async def pause(interaction: discord.Interaction):
 
 @tree.command(name="resume", description="Resumes the paused audio track")
 async def resume(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client is None or not voice_client.is_paused():
+        await interaction.response.send_message("No audio is currently paused.")
+        return
+    
+    voice_client.resume()
+    await interaction.response.send_message(f"Audio resumed, {interaction.user.name} Onii Sama.")
     return
 
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
