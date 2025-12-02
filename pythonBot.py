@@ -6,6 +6,7 @@ from discord import app_commands
 import os
 from dotenv import load_dotenv
 import requests
+from urllib.parse import urlparse, parse_qs
 import json
 import yt_dlp
 
@@ -91,6 +92,7 @@ async def _run_yt_dlp_info(url: str):
                     first = entries[0]
                     first_entry = {
                         'url': first.get('url'),
+                        'webpage_url': first.get('webpage_url'),
                         'duration': first.get('duration', 0),
                         'title': first.get('title'),
                     }
@@ -236,8 +238,8 @@ async def show_queue(interaction: discord.Interaction):
     queue_message = "Current Audio Queue waiting:\n" + "\n".join(f"{idx + 1}. {title}" for idx, title in enumerate(queue_list))
     await interaction.response.send_message(queue_message)
 
-@tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
-async def play(interaction: discord.Interaction, url: str, play_first: bool = True):
+@tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel (playlists/mixes ignored by default; set play_first=True to play the first video)")
+async def play(interaction: discord.Interaction, url: str, play_first: bool = False):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
     currentChannel = user.voice
@@ -254,6 +256,13 @@ async def play(interaction: discord.Interaction, url: str, play_first: bool = Tr
     
     
      
+    # Parse URL for YouTube 'list' parameter so we can detect playlist/mix-like URLs
+    parsed_url = urlparse(url)
+    query = parse_qs(parsed_url.query)
+    list_ids = query.get('list')
+    list_id = list_ids[0] if list_ids else None
+    is_mix_url = list_id is not None and list_id.upper().startswith('RD')
+
     # Extract info using yt_dlp in a thread so we don't block the event loop
     try:
         info = await _run_yt_dlp_info(url)
@@ -266,13 +275,73 @@ async def play(interaction: discord.Interaction, url: str, play_first: bool = Tr
     if isinstance(info, dict) and info.get('is_playlist'):
         if play_first:
             first_entry = info.get('first_entry')
-            if first_entry is None or first_entry.get('url') is None:
+            if first_entry is None:
                 await interaction.followup.send("This playlist can't be played (no extractable tracks). Please provide a single video URL or try another playlist.")
                 return
+
+            # If the first entry lacks a direct stream URL, but provides a webpage_url, try to re-extract
+            if first_entry.get('url') is None and first_entry.get('webpage_url'):
+                try:
+                    extracted_first = await _run_yt_dlp_info(first_entry.get('webpage_url'))
+                except Exception:
+                    logging.exception('Failed to extract first entry from playlist')
+                    await interaction.followup.send('This playlist contains a first entry that cannot be played.')
+                    return
+                if not isinstance(extracted_first, dict) or extracted_first.get('url') is None:
+                    await interaction.followup.send('Could not extract a playable first track from the playlist. Try another URL.')
+                    return
+                info = extracted_first
+            else:
+                if first_entry.get('url') is None:
+                    await interaction.followup.send("This playlist can't be played (no extractable tracks). Please provide a single video URL or try another playlist.")
+                    return
             # Convert the first entry into the same structure we expect for single videos
             info = {'url': first_entry['url'], 'duration': first_entry.get('duration', 0), 'title': first_entry.get('title')}
         else:
-            await interaction.followup.send("Playlists are not supported yet.")
+            await interaction.followup.send("Playlists are not supported. If you want to play the first track from the playlist, re-run the command with `play_first=true`.")
+            return
+
+    # If the URL included a 'list' parameter that looks like a YouTube Mix (RD), treat it similarly to a playlist
+    if list_id is not None and is_mix_url and not (isinstance(info, dict) and info.get('is_playlist')):
+        # We didn't get a playlist response back, but URL indicates it might be a mix.
+        if play_first:
+            # Try to fetch the playlist info by requesting the playlist URL directly
+            playlist_url = f"https://www.youtube.com/playlist?list={list_id}"
+            try:
+                playlist_info = await _run_yt_dlp_info(playlist_url)
+            except Exception:
+                logging.exception('Failed to extract mix/playlist info')
+                await interaction.followup.send('Unable to retrieve playlist info for the provided mix URL.')
+                return
+
+            if isinstance(playlist_info, dict) and playlist_info.get('is_playlist'):
+                first_entry = playlist_info.get('first_entry')
+                if first_entry is None:
+                    await interaction.followup.send('Could not extract a playable first track from the mix. Try another URL.')
+                    return
+
+                # If the first entry lacks a direct stream URL, try to re-extract using its webpage_url
+                if first_entry.get('url') is None and first_entry.get('webpage_url'):
+                    try:
+                        extracted_first = await _run_yt_dlp_info(first_entry.get('webpage_url'))
+                    except Exception:
+                        logging.exception('Failed to extract first entry from mix playlist')
+                        await interaction.followup.send('Could not extract a playable first track from the mix. Try another URL.')
+                        return
+                    if not isinstance(extracted_first, dict) or extracted_first.get('url') is None:
+                        await interaction.followup.send('Could not extract a playable first track from the mix. Try another URL.')
+                        return
+                    info = extracted_first
+                else:
+                    if first_entry.get('url') is None:
+                        await interaction.followup.send('Could not extract a playable first track from the mix. Try another URL.')
+                        return
+                    info = {'url': first_entry['url'], 'duration': first_entry.get('duration', 0), 'title': first_entry.get('title')}
+            else:
+                await interaction.followup.send('This mix URL does not appear to contain a playlist that can be extracted.')
+                return
+        else:
+            await interaction.followup.send('YouTube mix URLs (recommended mixes) are ignored by default. Use `play_first=true` to play the first track from the mix.')
             return
 
     # Ensure guild queue exists and enqueue the track
