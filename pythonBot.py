@@ -214,6 +214,13 @@ async def show_queue(interaction: discord.Interaction):
 
 @tree.command(name="pause", description="Pauses the current audio track")
 async def pause(interaction: discord.Interaction):
+    voice_client = interaction.guild.voice_client
+    if voice_client is None or not voice_client.is_playing():
+        await interaction.response.send_message("No audio is currently playing.")
+        return
+
+    voice_client.pause()
+    await interaction.response.send_message(f"Audio paused, {interaction.user.name} Onii Sama.")
     return
 
 @tree.command(name="resume", description="Resumes the paused audio track")
