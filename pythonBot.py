@@ -212,6 +212,10 @@ async def show_queue(interaction: discord.Interaction):
     queue_message = "Current Audio Queue waiting:\n" + "\n".join(f"{idx + 1}. {title}" for idx, title in enumerate(queue_list))
     await interaction.response.send_message(queue_message)
 
+@tree.command(name="pause", description="Pauses the current audio track")
+async def pause(interaction: discord.Interaction):
+    return
+
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
 async def play(interaction: discord.Interaction, url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
