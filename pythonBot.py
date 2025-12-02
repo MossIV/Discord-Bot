@@ -216,6 +216,10 @@ async def show_queue(interaction: discord.Interaction):
 async def pause(interaction: discord.Interaction):
     return
 
+@tree.command(name="resume", description="Resumes the paused audio track")
+async def resume(interaction: discord.Interaction):
+    return
+
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
 async def play(interaction: discord.Interaction, url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
