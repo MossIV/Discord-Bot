@@ -80,6 +80,29 @@ async def _run_yt_dlp_info(url: str):
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+
+            # yt_dlp returns a 'playlist' type when a URL is a playlist, or a dict containing 'entries'.
+            # Detect playlists and return a flag so the caller can decide to ignore or handle them.
+            if isinstance(info, dict) and 'entries' in info:
+                # Convert entries to a list and filter out None entries
+                entries = [e for e in info['entries'] if e is not None]
+                first_entry = None
+                if entries:
+                    first = entries[0]
+                    first_entry = {
+                        'url': first.get('url'),
+                        'duration': first.get('duration', 0),
+                        'title': first.get('title'),
+                    }
+
+                return {
+                    'is_playlist': True,
+                    'playlist_title': info.get('title'),
+                    'playlist_count': len(entries),
+                    'first_entry': first_entry,
+                }
+
+            # Normal single-video response
             return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title')}
 
     return await asyncio.to_thread(extract)
@@ -214,10 +237,9 @@ async def show_queue(interaction: discord.Interaction):
     await interaction.response.send_message(queue_message)
 
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
-async def play(interaction: discord.Interaction, url: str):
+async def play(interaction: discord.Interaction, url: str, play_first: bool = True):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
-    # await join_channel(user)
     currentChannel = user.voice
     if currentChannel is not None:
         voice_channel = currentChannel.channel
@@ -239,6 +261,19 @@ async def play(interaction: discord.Interaction, url: str):
         logging.exception('Failed to extract info')
         await interaction.followup.send(f'Failed to retrieve info for: {url}')
         return
+
+    # Handle playlists: _run_yt_dlp_info returns {'is_playlist': True, ...} for playlists
+    if isinstance(info, dict) and info.get('is_playlist'):
+        if play_first:
+            first_entry = info.get('first_entry')
+            if first_entry is None or first_entry.get('url') is None:
+                await interaction.followup.send("This playlist can't be played (no extractable tracks). Please provide a single video URL or try another playlist.")
+                return
+            # Convert the first entry into the same structure we expect for single videos
+            info = {'url': first_entry['url'], 'duration': first_entry.get('duration', 0), 'title': first_entry.get('title')}
+        else:
+            await interaction.followup.send("Playlists are not supported yet.")
+            return
 
     # Ensure guild queue exists and enqueue the track
     q = await _ensure_guild_queue(interaction.guild.id)
