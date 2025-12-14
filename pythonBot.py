@@ -237,6 +237,61 @@ async def resume(interaction: discord.Interaction):
     await interaction.response.send_message(f"Audio resumed, {interaction.user.name} Onii Sama.")
     return
 
+#TODO: implement search functionality.
+
+#Milestone 1: Detect Input Type in /play Command
+#    Description: Modify the /play slash command to accept either a URL or a search query. Detect if the input is a valid URL (using a simple regex or library like validators) or treat it as a search query.
+# Key Tasks:
+#     Add input validation: If it's a URL, proceed as before. If not, treat it as a search query.
+#     Update the command description to reflect this (e.g., "Plays audio from a YouTube URL or search query").
+# Effort: Low (1-2 hours). Just add a helper function for URL detection.
+# Testing: Run the bot and test with both a URL and a non-URL string (e.g., "never gonna give you up").
+# 
+# Milestone 2: Integrate yt_dlp Search in _run_yt_dlp_info
+#   Description: Update the _run_yt_dlp_info function to handle search queries by prefixing them with "ytsearch:" and extracting the first/best result.
+# Key Tasks:
+#   If input is not a URL, modify the query to "ytsearch:" + query.
+#   When extracting info, handle the search result (yt_dlp returns an "entries" list for searches—pick the first entry's URL, title, and duration).
+#   Ensure the function still returns a dict with 'url', 'duration', and 'title'.
+# Effort: Medium (2-4 hours). Involves parsing yt_dlp's search output.
+# Testing: Call the function manually with a search query and verify it returns valid audio info.
+
+# Milestone 3: Update User Response and Error Handling
+#   Description: Improve feedback to users when searching, and add basic error handling for failed searches.
+# Key Tasks:
+#   In /play, if searching, respond with the found title (e.g., "Enqueued: [Title] by [Artist]").
+#   Add try-except for search failures (e.g., no results, network issues) and send a user-friendly error message.
+#   Log errors for debugging.
+# Effort: Low (1-2 hours). Build on existing response logic.
+# Testing: Test with invalid queries (e.g., gibberish) and valid ones to ensure proper enqueuing.
+
+# Milestone 4: Add Search-Specific Features (Optional Enhancements)
+#   Description: Once basic search works, add niceties like multiple result options or search limits.
+# Key Tasks:
+#   Modify yt_dlp options to limit search results (e.g., 'default_search': 'ytsearch5' for top 5).
+#   Optionally, add a new /search command that lists results (e.g., "1. Title - URL\n2. ...") and lets users choose via reactions or a follow-up command.
+#   Integrate playlist support if yt_dlp finds one (e.g., enqueue all tracks from a search result).
+# Effort: Medium-High (4-8 hours). Requires UI changes for selection.
+# Testing: Test with popular queries and ensure enqueuing works for multiple tracks.
+
+# Milestone 5: Full Integration and Edge Case Testing
+#   Description: Ensure searching works across guilds, handles concurrent searches, and integrates with the queue/player system.
+# Key Tasks:
+#   Test per-guild queues with searches (e.g., multiple users searching simultaneously).
+#   Handle edge cases: Very long queries, special characters, non-YouTube sources (if yt_dlp supports them), or rate limits.
+#   Add rate limiting or caching if needed (e.g., avoid duplicate searches).
+# Effort: Medium (2-4 hours). Focus on real-world scenarios.
+# Testing: Run the bot in a test server, add multiple searches quickly, and monitor for heartbeat issues or crashes.
+
+# Milestone 6: Documentation and Deployment
+#   Description: Finalize and document the feature.
+# Key Tasks:
+#   Update readme.md with examples (e.g., "/play never gonna give you up").
+#   Add comments in code for the search logic.
+#   Deploy and monitor in production for any yt_dlp updates or API changes.
+# Effort: Low (1 hour).
+# Testing: Share with a small group and gather feedback.
+
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
 async def play(interaction: discord.Interaction, url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
@@ -252,8 +307,6 @@ async def play(interaction: discord.Interaction, url: str):
     if voice_client is None:
         await interaction.followup.send("Bot is not connected to a voice channel.")
         return
-    
-    
     
      
     # Extract info using yt_dlp in a thread so we don't block the event loop
