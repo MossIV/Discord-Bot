@@ -172,7 +172,10 @@ async def leave(interaction: discord.Interaction):
     voice_client = interaction.guild.voice_client
     if voice_client is not None:
         await voice_client.disconnect()
-        await interaction.response.send_message(f"Disconnected from the voice channel, {interaction.user.name} Onii Sama.")
+        if interaction.user.name == "mossv":
+            await interaction.response.send_message("I have retreated from the discussion chambers, My Creator")
+        else:
+            await interaction.response.send_message(f"Disconnected from the voice channel, {interaction.user.name} Onii Sama.")
     else:
         await interaction.response.send_message("I am not connected to any voice channel, are you dumb?")
 
