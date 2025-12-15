@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import requests
 import json
 import yt_dlp
+import re
 
 load_dotenv()
 
@@ -79,6 +80,9 @@ async def _run_yt_dlp_info(url: str):
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            if '_type' in info:
+                if info['_type'] == 'playlist':
+                    info = info['entries'][0]
             return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title')}
 
     return await asyncio.to_thread(extract)
