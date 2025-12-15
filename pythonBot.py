@@ -350,7 +350,10 @@ async def play(interaction: discord.Interaction, raw_url: str):
 
     # Respond to user
     title = info.get('title') or url
-    await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything\n{url}')
+    if len(urls) > 1:
+        await interaction.followup.send(f'My Onii Sama {user.name} wants me to play the following tracks, gosh Onii Sama, you\' re so annoying.\n\n' + '\n - '.join(title_of_urls))
+    else:
+        await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything.\n{url}')
         
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
