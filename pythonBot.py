@@ -243,32 +243,6 @@ async def resume(interaction: discord.Interaction):
 
 #TODO: implement search functionality.
 
-#Milestone 1: Detect Input Type in /play Command
-#    Description: Modify the /play slash command to accept either a URL or a search query. Detect if the input is a valid URL (using a simple regex or library like validators) or treat it as a search query.
-# Key Tasks:
-#     Add input validation: If it's a URL, proceed as before. If not, treat it as a search query.
-#     Update the command description to reflect this (e.g., "Plays audio from a YouTube URL or search query").
-# Effort: Low (1-2 hours). Just add a helper function for URL detection.
-# Testing: Run the bot and test with both a URL and a non-URL string (e.g., "never gonna give you up").
-# 
-# Milestone 2: Integrate yt_dlp Search in _run_yt_dlp_info
-#   Description: Update the _run_yt_dlp_info function to handle search queries by prefixing them with "ytsearch:" and extracting the first/best result.
-# Key Tasks:
-#   If input is not a URL, modify the query to "ytsearch:" + query.
-#   When extracting info, handle the search result (yt_dlp returns an "entries" list for searches—pick the first entry's URL, title, and duration).
-#   Ensure the function still returns a dict with 'url', 'duration', and 'title'.
-# Effort: Medium (2-4 hours). Involves parsing yt_dlp's search output.
-# Testing: Call the function manually with a search query and verify it returns valid audio info.
-
-# Milestone 3: Update User Response and Error Handling
-#   Description: Improve feedback to users when searching, and add basic error handling for failed searches.
-# Key Tasks:
-#   In /play, if searching, respond with the found title (e.g., "Enqueued: [Title] by [Artist]").
-#   Add try-except for search failures (e.g., no results, network issues) and send a user-friendly error message.
-#   Log errors for debugging.
-# Effort: Low (1-2 hours). Build on existing response logic.
-# Testing: Test with invalid queries (e.g., gibberish) and valid ones to ensure proper enqueuing.
-
 # Milestone 4: Add Search-Specific Features (Optional Enhancements)
 #   Description: Once basic search works, add niceties like multiple result options or search limits.
 # Key Tasks:
