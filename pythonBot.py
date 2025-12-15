@@ -293,7 +293,7 @@ async def resume(interaction: discord.Interaction):
 # Testing: Share with a small group and gather feedback.
 
 @tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
-async def play(interaction: discord.Interaction, url: str):
+async def play(interaction: discord.Interaction, raw_url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
     # await join_channel(user)
