@@ -308,18 +308,38 @@ async def play(interaction: discord.Interaction, url: str):
         await interaction.followup.send("Bot is not connected to a voice channel.")
         return
     
-     
-    # Extract info using yt_dlp in a thread so we don't block the event loop
-    try:
-        info = await _run_yt_dlp_info(url)
-    except Exception:
-        logging.exception('Failed to extract info')
-        await interaction.followup.send(f'Failed to retrieve info for: {url}')
-        return
-
-    # Ensure guild queue exists and enqueue the track
     q = await _ensure_guild_queue(interaction.guild.id)
-    await q.put(info)
+    
+    urls = re.findall(r'https?://\S+', raw_url)
+    title_of_urls = []
+    # Extract info using yt_dlp in a thread so we don't block the event loop
+    if urls:
+        for url in urls:
+            try:
+                info = await _run_yt_dlp_info(url)
+            except Exception:
+                logging.exception('Failed to extract info')
+                await interaction.followup.send(f'Failed to retrieve info for: {url}')
+                return
+            title_of_urls.append(info.get('title'))
+            # Ensure guild queue exists and enqueue the track
+            await q.put(info)
+    else:
+        # Treat raw_url as a search query
+        search_query = f"ytsearch:{raw_url}"
+        try:
+            info = await _run_yt_dlp_info(search_query)
+        except Exception:
+            logging.exception('Failed to extract info for search query')
+            await interaction.followup.send(f'Failed to retrieve info for search query: {raw_url}')
+            return
+
+        # Ensure guild queue exists and enqueue the track
+        await q.put(info)
+        if info.get('id', '') == '':
+            url = f"{user.name} Onii Sama, has asked me to search this up: {raw_url}"
+        else:
+            url = f"https://www.youtube.com/watch?v={info.get('id', '')}" 
 
     # Start background player task for this guild if not running
     await start_player_task_if_needed(interaction.guild, voice_client)
