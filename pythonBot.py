@@ -270,8 +270,8 @@ async def resume(interaction: discord.Interaction):
 # Effort: Low (1 hour).
 # Testing: Share with a small group and gather feedback.
 
-@tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
-async def play(interaction: discord.Interaction, raw_url: str):
+@tree.command(name="play", description="Plays audio from a YouTube URL or search query, URLs can be stacked with spaces in between")
+async def play(interaction: discord.Interaction, search_or_url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
     # await join_channel(user)
@@ -288,7 +288,7 @@ async def play(interaction: discord.Interaction, raw_url: str):
     
     q = await _ensure_guild_queue(interaction.guild.id)
     
-    urls = re.findall(r'https?://\S+', raw_url)
+    urls = re.findall(r'https?://\S+', search_or_url)
     title_of_urls = []
     # Extract info using yt_dlp in a thread so we don't block the event loop
     if urls:
@@ -303,19 +303,19 @@ async def play(interaction: discord.Interaction, raw_url: str):
             # Ensure guild queue exists and enqueue the track
             await q.put(info)
     else:
-        # Treat raw_url as a search query
-        search_query = f"ytsearch:{raw_url}"
+        # Treat search_or_url as a search query
+        search_query = f"ytsearch:{search_or_url}"
         try:
             info = await _run_yt_dlp_info(search_query)
         except Exception:
             logging.exception('Failed to extract info for search query')
-            await interaction.followup.send(f'Failed to retrieve info for search query: {raw_url}')
+            await interaction.followup.send(f'Failed to retrieve info for search query: {search_or_url}')
             return
 
         # Ensure guild queue exists and enqueue the track
         await q.put(info)
         if info.get('id', '') == '':
-            url = f"{user.name} Onii Sama, has asked me to search this up: {raw_url}"
+            url = f"{user.name} Onii Sama, has asked me to search this up: {search_or_url}"
         else:
             url = f"https://www.youtube.com/watch?v={info.get('id', '')}" 
 
@@ -325,7 +325,7 @@ async def play(interaction: discord.Interaction, raw_url: str):
     # Respond to user
     title = info.get('title') or url
     if len(urls) > 1:
-        await interaction.followup.send(f'My Onii Sama {user.name} wants me to play the following tracks, gosh Onii Sama, you\' re so annoying.\n\n' + '\n - '.join(title_of_urls))
+        await interaction.followup.send(f'My Onii Sama {user.name} wants me to play the following tracks, gosh Onii Sama, you\' re so annoying.\n\n' + '\n'.join(title_of_urls))
     else:
         await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything.\n{url}')
         
