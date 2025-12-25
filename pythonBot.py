@@ -83,7 +83,7 @@ async def _run_yt_dlp_info(url: str):
             if '_type' in info:
                 if info['_type'] == 'playlist':
                     info = info['entries'][0]
-            return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title')}
+            return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title'), 'is_autoplay': False}
 
     return await asyncio.to_thread(extract)
 
@@ -271,9 +271,6 @@ async def resume(interaction: discord.Interaction):
 # Testing: Share with a small group and gather feedback.
 
 #TODO: Implement Autoplay Feature
-# Extend the Queue Item Structure
-# Modify the queue items (currently a dict with 'url', 'duration', 'title') to include a new key like 'is_autoplay': bool (default False for user-added songs). This allows distinguishing autoplay tracks for interruption logic.
-
 # Track the Last Played Song
 # Add a per-guild variable (e.g., in a dict like guild_last_song) to store the YouTube video ID of the last song that finished playing. Update this in the player_loop after each successful playback.
 
