@@ -270,6 +270,46 @@ async def resume(interaction: discord.Interaction):
 # Effort: Low (1 hour).
 # Testing: Share with a small group and gather feedback.
 
+#TODO: Implement Autoplay Feature
+# Extend the Queue Item Structure
+# Modify the queue items (currently a dict with 'url', 'duration', 'title') to include a new key like 'is_autoplay': bool (default False for user-added songs). This allows distinguishing autoplay tracks for interruption logic.
+
+# Track the Last Played Song
+# Add a per-guild variable (e.g., in a dict like guild_last_song) to store the YouTube video ID of the last song that finished playing. Update this in the player_loop after each successful playback.
+
+# Fetch Related Videos from YouTube
+# Create a new async function (e.g., get_related_video(last_video_id)) that uses yt_dlp to extract info for the last played video and retrieve a related video. Use the 'related_videos' list from the extracted info, pick the first one, and return its details. Handle cases where no related videos are available (fallback or skip).
+
+# Modify the Player Loop for Autoplay
+# Update the player_loop to check if the queue is empty after a song finishes. If empty, call the related video function, add the result to the queue with 'is_autoplay': True, and continue playback. Ensure this doesn't block the loop (use async calls).
+
+# Implement Autoplay Interruption
+# In the /play command (and any other enqueue functions), after adding user songs, check if the current voice client is playing an autoplay track (via a new per-guild flag like guild_current_is_autoplay). If yes, call voice_client.stop() to interrupt it immediately, then let the player loop proceed to the new user-added song.
+
+# Add Autoplay Toggle Command
+# Create a new slash command (e.g., /autoplay on|off) to enable/disable autoplay per guild. Store this in a per-guild dict (e.g., guild_autoplay_enabled). Only trigger autoplay in the player loop if enabled.
+
+# Handle Edge Cases
+
+#   If fetching related videos fails (network issues, yt_dlp errors), log the error and skip autoplay for that cycle.
+#   Prevent autoplay from queuing the same video repeatedly (check against recent history).
+#   Ensure autoplay doesn't trigger if the bot is disconnected or no voice client exists.
+#   Test with playlists: If a user adds a playlist, autoplay should wait until the entire playlist finishes.
+# 
+# Update Queue Display
+#   Modify the /queue command to indicate autoplay tracks (e.g., append "(Autoplay)" to titles) so users know which tracks are auto-generated.
+
+# Testing and Validation
+
+#   Test autoplay triggering after queue empties.
+#   Test interruption: Play an autoplay song, add a user song, verify autoplay stops.
+#   Test per-guild isolation (autoplay in one guild doesn't affect others).
+#   Handle rate limits or yt_dlp changes (YouTube API updates).
+#   Run the bot and monitor for crashes or infinite loops.
+# 
+# Documentation and Cleanup
+#   Update readme.md with autoplay usage (e.g., "Autoplay automatically queues related songs when the queue is empty. Use /autoplay off to disable."). Add code comments for new logic. Ensure no breaking changes to existing commands.
+
 @tree.command(name="play", description="Plays audio from a YouTube URL or search query, URLs can be stacked with spaces in between")
 async def play(interaction: discord.Interaction, search_or_url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
