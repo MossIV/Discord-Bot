@@ -18,6 +18,7 @@ queue = []
 
 # Per-guild async queues and player tasks
 guild_queues = {}
+guild_last_song = {}
 player_tasks = {}
 
 def get_meme():
@@ -122,6 +123,7 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
             except Exception as e:
                 logging.exception('Error during playback')
             finally:
+                guild_last_song[guild.id] = item.get('id', None)
                 q.task_done()
 
     player_tasks[guild.id] = asyncio.create_task(player_loop())
@@ -271,8 +273,6 @@ async def resume(interaction: discord.Interaction):
 # Testing: Share with a small group and gather feedback.
 
 #TODO: Implement Autoplay Feature
-# Track the Last Played Song
-# Add a per-guild variable (e.g., in a dict like guild_last_song) to store the YouTube video ID of the last song that finished playing. Update this in the player_loop after each successful playback.
 
 # Fetch Related Videos from YouTube
 # Create a new async function (e.g., get_related_video(last_video_id)) that uses yt_dlp to extract info for the last played video and retrieve a related video. Use the 'related_videos' list from the extracted info, pick the first one, and return its details. Handle cases where no related videos are available (fallback or skip).
