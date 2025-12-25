@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import requests
 import json
 import yt_dlp
+import re
 
 load_dotenv()
 
@@ -79,6 +80,9 @@ async def _run_yt_dlp_info(url: str):
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            if '_type' in info:
+                if info['_type'] == 'playlist':
+                    info = info['entries'][0]
             return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title')}
 
     return await asyncio.to_thread(extract)
@@ -237,8 +241,37 @@ async def resume(interaction: discord.Interaction):
     await interaction.response.send_message(f"Audio resumed, {interaction.user.name} Onii Sama.")
     return
 
-@tree.command(name="play", description="Plays audio from a YouTube URL in your current voice channel")
-async def play(interaction: discord.Interaction, url: str):
+#TODO: implement search functionality.
+
+# Milestone 4: Add Search-Specific Features (Optional Enhancements)
+#   Description: Once basic search works, add niceties like multiple result options or search limits.
+# Key Tasks:
+#   Modify yt_dlp options to limit search results (e.g., 'default_search': 'ytsearch5' for top 5).
+#   Optionally, add a new /search command that lists results (e.g., "1. Title - URL\n2. ...") and lets users choose via reactions or a follow-up command.
+#   Integrate playlist support if yt_dlp finds one (e.g., enqueue all tracks from a search result).
+# Effort: Medium-High (4-8 hours). Requires UI changes for selection.
+# Testing: Test with popular queries and ensure enqueuing works for multiple tracks.
+
+# Milestone 5: Full Integration and Edge Case Testing
+#   Description: Ensure searching works across guilds, handles concurrent searches, and integrates with the queue/player system.
+# Key Tasks:
+#   Test per-guild queues with searches (e.g., multiple users searching simultaneously).
+#   Handle edge cases: Very long queries, special characters, non-YouTube sources (if yt_dlp supports them), or rate limits.
+#   Add rate limiting or caching if needed (e.g., avoid duplicate searches).
+# Effort: Medium (2-4 hours). Focus on real-world scenarios.
+# Testing: Run the bot in a test server, add multiple searches quickly, and monitor for heartbeat issues or crashes.
+
+# Milestone 6: Documentation and Deployment
+#   Description: Finalize and document the feature.
+# Key Tasks:
+#   Update readme.md with examples (e.g., "/play never gonna give you up").
+#   Add comments in code for the search logic.
+#   Deploy and monitor in production for any yt_dlp updates or API changes.
+# Effort: Low (1 hour).
+# Testing: Share with a small group and gather feedback.
+
+@tree.command(name="play", description="Plays audio from a YouTube URL or search query, URLs can be stacked with spaces in between")
+async def play(interaction: discord.Interaction, search_or_url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
     # await join_channel(user)
@@ -253,27 +286,48 @@ async def play(interaction: discord.Interaction, url: str):
         await interaction.followup.send("Bot is not connected to a voice channel.")
         return
     
-    
-    
-     
-    # Extract info using yt_dlp in a thread so we don't block the event loop
-    try:
-        info = await _run_yt_dlp_info(url)
-    except Exception:
-        logging.exception('Failed to extract info')
-        await interaction.followup.send(f'Failed to retrieve info for: {url}')
-        return
-
-    # Ensure guild queue exists and enqueue the track
     q = await _ensure_guild_queue(interaction.guild.id)
-    await q.put(info)
+    
+    urls = re.findall(r'https?://\S+', search_or_url)
+    title_of_urls = []
+    # Extract info using yt_dlp in a thread so we don't block the event loop
+    if urls:
+        for url in urls:
+            try:
+                info = await _run_yt_dlp_info(url)
+            except Exception:
+                logging.exception('Failed to extract info')
+                await interaction.followup.send(f'Failed to retrieve info for: {url}')
+                return
+            title_of_urls.append(info.get('title'))
+            # Ensure guild queue exists and enqueue the track
+            await q.put(info)
+    else:
+        # Treat search_or_url as a search query
+        search_query = f"ytsearch:{search_or_url}"
+        try:
+            info = await _run_yt_dlp_info(search_query)
+        except Exception:
+            logging.exception('Failed to extract info for search query')
+            await interaction.followup.send(f'Failed to retrieve info for search query: {search_or_url}')
+            return
+
+        # Ensure guild queue exists and enqueue the track
+        await q.put(info)
+        if info.get('id', '') == '':
+            url = f"{user.name} Onii Sama, has asked me to search this up: {search_or_url}"
+        else:
+            url = f"https://www.youtube.com/watch?v={info.get('id', '')}" 
 
     # Start background player task for this guild if not running
     await start_player_task_if_needed(interaction.guild, voice_client)
 
     # Respond to user
     title = info.get('title') or url
-    await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything\n{url}')
+    if len(urls) > 1:
+        await interaction.followup.send(f'My Onii Sama {user.name} wants me to play the following tracks, gosh Onii Sama, you\' re so annoying.\n\n' + '\n'.join(title_of_urls))
+    else:
+        await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything.\n{url}')
         
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
