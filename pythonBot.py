@@ -203,9 +203,11 @@ async def show_queue(interaction: discord.Interaction):
 
     queue_list = []
     temp_queue = asyncio.Queue()
-
+    total_duration = 0
+    
     while not q.empty():
         item = await q.get()
+        total_duration += item.get('duration', 0)
         queue_list.append(item.get('title', 'Unknown Title'))
         await temp_queue.put(item)
         q.task_done()
@@ -216,7 +218,19 @@ async def show_queue(interaction: discord.Interaction):
         await q.put(item)
         temp_queue.task_done()
 
-    queue_message = "Current Audio Queue waiting:\n" + "\n".join(f"{idx + 1}. {title}" for idx, title in enumerate(queue_list))
+    if total_duration >= 3600:
+        hours = total_duration // 3600
+        minutes = (total_duration % 3600) // 60
+        seconds = total_duration % 60
+        duration_str = f"{hours}h {minutes}m {seconds}s in queue"
+    elif total_duration >= 60:
+        minutes = total_duration // 60
+        seconds = total_duration % 60
+        duration_str = f"{minutes}m {seconds}s in queue"
+    else:
+        duration_str = f"{total_duration}s in queue"
+    
+    queue_message = "Current Audio Queue waiting:\n" + "\n".join(f"{idx + 1}. {title}" for idx, title in enumerate(queue_list)) + f"\nTotal Duration: {duration_str}"
     await interaction.response.send_message(queue_message)
 
 @tree.command(name="pause", description="Pauses the current audio track")
