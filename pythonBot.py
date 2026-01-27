@@ -88,9 +88,13 @@ async def _run_yt_dlp_info(url: str):
     return await asyncio.to_thread(extract)
 
 async def startup(vc: discord.VoiceClient):
-    startupVoices = ["./joining voicelines/1.m4a","./joining voicelines/2.m4a","./joining voicelines/3.m4a"]
-    choice = random.choice(startupVoices)
+    startupVoices = ["./joining voicelines/1.m4a","./joining voicelines/2.m4a","./joining voicelines/3.m4a","./joining voicelines/special.m4a"]
+    weights = [33,33,33,1]
+    choice = random.choices(startupVoices, weights=weights, k=1)[0]
     vc.play(discord.FFmpegPCMAudio(choice))
+    
+    while vc.is_playing():
+        await asyncio.sleep(0.5)
     return
 
 async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient):
