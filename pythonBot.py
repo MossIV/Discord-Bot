@@ -43,24 +43,7 @@ def get_yeah_nah():
     json_data = response.json()
     response_json = [json_data['answer'],json_data['image']]
     return response_json
-
-def add_to_queue(audio_url, audio_duration):
-    queue.insert(0,[audio_url, audio_duration])
-    return
-
-
-def get_from_queue():
-    if len(queue) > 0:
-        return queue[len(queue)-1]
-    else:
-        return None
-    
-
-def pop_queue():
-    if len(queue) > 0:
-        queue.pop()
-    return
-
+   
 async def _ensure_guild_queue(guild_id: int):
     if guild_id not in guild_queues:
         guild_queues[guild_id] = asyncio.Queue()
