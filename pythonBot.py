@@ -43,24 +43,7 @@ def get_yeah_nah():
     json_data = response.json()
     response_json = [json_data['answer'],json_data['image']]
     return response_json
-
-def add_to_queue(audio_url, audio_duration):
-    queue.insert(0,[audio_url, audio_duration])
-    return
-
-
-def get_from_queue():
-    if len(queue) > 0:
-        return queue[len(queue)-1]
-    else:
-        return None
-    
-
-def pop_queue():
-    if len(queue) > 0:
-        queue.pop()
-    return
-
+   
 async def _ensure_guild_queue(guild_id: int):
     if guild_id not in guild_queues:
         guild_queues[guild_id] = asyncio.Queue()
@@ -88,9 +71,13 @@ async def _run_yt_dlp_info(url: str):
     return await asyncio.to_thread(extract)
 
 async def startup(vc: discord.VoiceClient):
-    startupVoices = ["./joining voicelines/1.m4a","./joining voicelines/2.m4a","./joining voicelines/3.m4a"]
-    choice = random.choice(startupVoices)
+    startupVoices = ["./joining voicelines/1.m4a","./joining voicelines/2.m4a","./joining voicelines/3.m4a","./joining voicelines/special.m4a"]
+    weights = [33,33,33,1]
+    choice = random.choices(startupVoices, weights=weights, k=1)[0]
     vc.play(discord.FFmpegPCMAudio(choice))
+    
+    while vc.is_playing():
+        await asyncio.sleep(0.5)
     return
 
 async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient):
