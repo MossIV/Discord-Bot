@@ -16,6 +16,7 @@ import logging
 
 # Per-guild async queues and player tasks
 guild_queues = {}
+guild_inactivity_tasks = {}
 player_tasks = {}
 
 def get_meme():
@@ -46,6 +47,66 @@ async def _ensure_guild_queue(guild_id: int):
     if guild_id not in guild_queues:
         guild_queues[guild_id] = asyncio.Queue()
     return guild_queues[guild_id]
+
+async def check_inactivity_and_schedule(guild: discord.Guild, text_channel: discord.TextChannel = None):
+    """Check if bot is alone and schedule disconnect if needed"""
+    guild_id = guild.id
+    vc = guild.voice_client
+    
+    # If no voice client, cancel any existing timer and return
+    if vc is None:
+        if guild_id in guild_inactivity_tasks:
+            guild_inactivity_tasks[guild_id].cancel()
+            del guild_inactivity_tasks[guild_id]
+        return
+    
+    # Count users in the voice channel
+    users_in_vc = [m for m in vc.channel.members if not m.bot]
+    
+    # If users are present, cancel any existing timer
+    if len(users_in_vc) > 0:
+        if guild_id in guild_inactivity_tasks:
+            guild_inactivity_tasks[guild_id].cancel()
+            del guild_inactivity_tasks[guild_id]
+        return
+    
+    # Bot is alone - start timer if not already running
+    if guild_id in guild_inactivity_tasks and not guild_inactivity_tasks[guild_id].done():
+        return  # Timer already running, don't restart
+    
+    async def disconnect_after_timeout():
+        try:
+            await asyncio.sleep(300)  # 5 minutes
+            
+            # Double-check before disconnecting
+            current_vc = guild.voice_client
+            if current_vc is None:
+                return
+            
+            users_still_in_vc = [m for m in current_vc.channel.members if not m.bot]
+            if len(users_still_in_vc) == 0:
+                # Find a text channel to send goodbye message
+                channel_to_use = text_channel
+                if channel_to_use is None:
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(guild.me).send_messages:
+                            channel_to_use = channel
+                            break
+                
+                if channel_to_use:
+                    await channel_to_use.send("I've been alone for 5 minutes... I guess nobody wants to listen to me anymore. I'm leaving now, baka!")
+                
+                await current_vc.disconnect()
+        except asyncio.CancelledError:
+            pass  # Timer was cancelled, normal behavior
+        except Exception:
+            logging.exception('Error in inactivity disconnect')
+        finally:
+            # Clean up task reference
+            if guild_id in guild_inactivity_tasks:
+                del guild_inactivity_tasks[guild_id]
+    
+    guild_inactivity_tasks[guild_id] = asyncio.create_task(disconnect_after_timeout())
 
 async def _run_yt_dlp_info(url: str):
     # Run blocking yt_dlp.extract_info in a thread to avoid blocking the event loop
