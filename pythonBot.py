@@ -80,7 +80,7 @@ async def startup(vc: discord.VoiceClient):
         await asyncio.sleep(0.5)
     return
 
-async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient):
+async def start_player_task_if_needed(guild: discord.Guild, voice_client: discord.VoiceClient, text_channel: discord.TextChannel):
     # Start a background player loop per guild if not already running
     if guild.id in player_tasks and not player_tasks[guild.id].done():
         return
@@ -100,6 +100,7 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                     continue
 
                 source = discord.FFmpegPCMAudio(item['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
+                await text_channel.send(f"Now Playing: {item['title']}")
                 vc.play(source)
 
                 # Wait for playback to finish without blocking the loop
@@ -275,6 +276,8 @@ async def resume(interaction: discord.Interaction):
 async def play(interaction: discord.Interaction, search_or_url: str):
     await interaction.response.defer()  # Acknowledge the command to avoid timeout
     user = interaction.user
+    text_channel = interaction.channel
+    
     # await join_channel(user)
     currentChannel = user.voice
     if currentChannel is not None:
@@ -321,7 +324,7 @@ async def play(interaction: discord.Interaction, search_or_url: str):
             url = f"https://www.youtube.com/watch?v={info.get('id', '')}" 
 
     # Start background player task for this guild if not running
-    await start_player_task_if_needed(interaction.guild, voice_client)
+    await start_player_task_if_needed(interaction.guild, voice_client, text_channel)
 
     # Respond to user
     title = info.get('title') or url
