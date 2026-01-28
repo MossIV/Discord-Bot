@@ -118,24 +118,48 @@ async def check_inactivity_and_schedule(guild: discord.Guild, text_channel: disc
     guild_inactivity_tasks[guild_id] = asyncio.create_task(disconnect_after_timeout())
 
 async def _run_yt_dlp_info(url: str):
-    # Run blocking yt_dlp.extract_info in a thread to avoid blocking the event loop
+    """Extract metadata only, not the streaming URL"""
     def extract():
         ydl_opts = {
-            'format': 'm4a/bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'm4a',
-            }],
-            'extractor-args': "youtube:player_client=default",
+            'format': 'bestaudio/best',
             'noplaylist': True,
+            'skip_download': True,  # Don't need the URL yet
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if '_type' in info:
                 if info['_type'] == 'playlist':
                     info = info['entries'][0]
-            return {'url': info['url'], 'duration': info.get('duration', 0), 'title': info.get('title')}
+            # Only store metadata, not the streaming URL
+            return {
+                'id': info.get('id', ''),
+                'duration': info.get('duration', 0), 
+                'title': info.get('title'),
+                'webpage_url': info.get('webpage_url', url)
+            }
 
+    return await asyncio.to_thread(extract)
+
+async def _get_fresh_stream_url(video_id_or_url: str):
+    """Extract fresh streaming URL right before playback"""
+    def extract():
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'noplaylist': True,
+            'quiet': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # If it's just an ID, construct the URL
+            if not video_id_or_url.startswith('http'):
+                video_id_or_url = f"https://www.youtube.com/watch?v={video_id_or_url}"
+            
+            info = ydl.extract_info(video_id_or_url, download=False)
+            if '_type' in info and info['_type'] == 'playlist':
+                info = info['entries'][0]
+            return info['url']
+    
     return await asyncio.to_thread(extract)
 
 async def startup(vc: discord.VoiceClient):
@@ -167,16 +191,27 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                     logging.warning(f"No voice client for guild {guild.id}, skipping playback")
                     continue
 
-                source = discord.FFmpegPCMAudio(item['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
-                await guild_text_channels[guild.id].send(f"Now Playing: {item['title']}")
+                # Extract fresh streaming URL right before playing
+                try:
+                    stream_url = await _get_fresh_stream_url(item.get('id') or item.get('webpage_url'))
+                except Exception as e:
+                    logging.exception('Failed to get streaming URL')
+                    await text_channel.send(f"Failed to play: {item.get('title', 'Unknown')} - Could not retrieve stream")
+                    continue
+
+                source = discord.FFmpegPCMAudio(
+                    stream_url, 
+                    before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+                )
+                await text_channel.send(f"Now Playing: {item['title']}")
                 vc.play(source)
 
-                # Wait for playback to finish without blocking the loop
                 while vc.is_playing() or vc.is_paused():
                     await asyncio.sleep(1)
 
             except Exception as e:
                 logging.exception('Error during playback')
+                await text_channel.send(f"Failed to play: {item.get('title', 'Unknown')}")
             finally:
                 q.task_done()
 
