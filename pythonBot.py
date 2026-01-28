@@ -187,6 +187,20 @@ class MyClient(discord.Client):
         if message.author == self.user:
             return
                 
+        
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Monitor voice channel activity"""
+        voice_client = member.guild.voice_client
+        
+        # Only care if bot is connected and the change involves the bot's channel
+        if voice_client is None:
+            return
+        
+        # Check if the state change involves the bot's current channel
+        bot_channel = voice_client.channel
+        if before.channel == bot_channel or after.channel == bot_channel:
+            # Something changed in bot's channel, re-evaluate inactivity
+            await check_inactivity_and_schedule(member.guild)
                     
                     
                     
@@ -391,7 +405,9 @@ async def play(interaction: discord.Interaction, search_or_url: str):
         await interaction.followup.send(f'My Onii Sama {user.name} wants me to play the following tracks, gosh Onii Sama, you\' re so annoying.\n\n' + '\n'.join(title_of_urls))
     else:
         await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything.\n{url}')
-        
+   
+    await check_inactivity_and_schedule(interaction.guild, text_channel)
+    
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
 client.run(DISCORD_TOKEN)
