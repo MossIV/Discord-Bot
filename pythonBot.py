@@ -16,6 +16,8 @@ import logging
 
 # Per-guild async queues and player tasks
 guild_queues = {}
+guild_inactivity_tasks = {}
+guild_text_channels = {}
 player_tasks = {}
 
 def get_meme():
@@ -46,6 +48,74 @@ async def _ensure_guild_queue(guild_id: int):
     if guild_id not in guild_queues:
         guild_queues[guild_id] = asyncio.Queue()
     return guild_queues[guild_id]
+
+async def check_inactivity_and_schedule(guild: discord.Guild, text_channel: discord.TextChannel = None):
+    """Check if bot is alone and schedule disconnect if needed"""
+    guild_id = guild.id
+    vc = guild.voice_client
+    
+    # Store text_channel if provided
+    if text_channel is not None:
+        guild_text_channels[guild_id] = text_channel
+    
+    # If no voice client, cancel any existing timer and return
+    if vc is None:
+        if guild_id in guild_inactivity_tasks:
+            guild_inactivity_tasks[guild_id].cancel()
+            del guild_inactivity_tasks[guild_id]
+        return
+    
+    # Count users in the voice channel
+    users_in_vc = [m for m in vc.channel.members if not m.bot]
+    
+    # If users are present, cancel any existing timer
+    if len(users_in_vc) > 0:
+        if guild_id in guild_inactivity_tasks:
+            guild_inactivity_tasks[guild_id].cancel()
+            del guild_inactivity_tasks[guild_id]
+        return
+    
+    # Bot is alone - start timer if not already running
+    if guild_id in guild_inactivity_tasks and not guild_inactivity_tasks[guild_id].done():
+        return  # Timer already running, don't restart
+    
+    async def disconnect_after_timeout():
+        try:
+            await asyncio.sleep(300)  # 5 minutes
+            
+            # Double-check before disconnecting
+            current_vc = guild.voice_client
+            if current_vc is None:
+                return
+            
+            users_still_in_vc = [m for m in current_vc.channel.members if not m.bot]
+            if len(users_still_in_vc) == 0:
+                # Try to use stored text_channel first, then provided one, then search
+                channel_to_use = guild_text_channels.get(guild_id) or text_channel
+                if channel_to_use is None:
+                    for channel in guild.text_channels:
+                        if channel.permissions_for(guild.me).send_messages:
+                            channel_to_use = channel
+                            break
+                
+                if channel_to_use:
+                    await channel_to_use.send("I've been alone for 5 minutes... I guess nobody wants to listen to me anymore. I'm leaving now, baka!")
+                
+                await current_vc.disconnect()
+                
+                # Clean up stored text channel when disconnecting
+                if guild_id in guild_text_channels:
+                    del guild_text_channels[guild_id]
+        except asyncio.CancelledError:
+            pass  # Timer was cancelled, normal behavior
+        except Exception:
+            logging.exception('Error in inactivity disconnect')
+        finally:
+            # Clean up task reference
+            if guild_id in guild_inactivity_tasks:
+                del guild_inactivity_tasks[guild_id]
+    
+    guild_inactivity_tasks[guild_id] = asyncio.create_task(disconnect_after_timeout())
 
 async def _run_yt_dlp_info(url: str):
     # Run blocking yt_dlp.extract_info in a thread to avoid blocking the event loop
@@ -98,7 +168,7 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                     continue
 
                 source = discord.FFmpegPCMAudio(item['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
-                await text_channel.send(f"Now Playing: {item['title']}")
+                await guild_text_channels[guild.id].send(f"Now Playing: {item['title']}")
                 vc.play(source)
 
                 # Wait for playback to finish without blocking the loop
@@ -126,6 +196,20 @@ class MyClient(discord.Client):
         if message.author == self.user:
             return
                 
+        
+    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
+        """Monitor voice channel activity"""
+        voice_client = member.guild.voice_client
+        
+        # Only care if bot is connected and the change involves the bot's channel
+        if voice_client is None:
+            return
+        
+        # Check if the state change involves the bot's current channel
+        bot_channel = voice_client.channel
+        if before.channel == bot_channel or after.channel == bot_channel:
+            # Something changed in bot's channel, re-evaluate inactivity
+            await check_inactivity_and_schedule(member.guild)
                     
                     
                     
@@ -321,6 +405,7 @@ async def play(interaction: discord.Interaction, search_or_url: str):
         else:
             url = f"https://www.youtube.com/watch?v={info.get('id', '')}" 
 
+    guild_text_channels[interaction.guild.id] = text_channel
     # Start background player task for this guild if not running
     await start_player_task_if_needed(interaction.guild, voice_client, text_channel)
 
@@ -330,7 +415,9 @@ async def play(interaction: discord.Interaction, search_or_url: str):
         await interaction.followup.send(f'My Onii Sama {user.name} wants me to play the following tracks, gosh Onii Sama, you\' re so annoying.\n\n' + '\n'.join(title_of_urls))
     else:
         await interaction.followup.send(f'My Onii Sama {user.name} wants {title}, its not like I wanted to play it or anything.\n{url}')
-        
+   
+    await check_inactivity_and_schedule(interaction.guild, text_channel)
+    
 if DISCORD_TOKEN is None:
     raise ValueError("DISCORD_TOKEN environment variable is not set")
 client.run(DISCORD_TOKEN)
