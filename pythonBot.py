@@ -17,6 +17,7 @@ import logging
 # Per-guild async queues and player tasks
 guild_queues = {}
 guild_inactivity_tasks = {}
+guild_text_channels = {}
 player_tasks = {}
 
 def get_meme():
@@ -53,6 +54,10 @@ async def check_inactivity_and_schedule(guild: discord.Guild, text_channel: disc
     guild_id = guild.id
     vc = guild.voice_client
     
+    # Store text_channel if provided
+    if text_channel is not None:
+        guild_text_channels[guild_id] = text_channel
+    
     # If no voice client, cancel any existing timer and return
     if vc is None:
         if guild_id in guild_inactivity_tasks:
@@ -85,8 +90,8 @@ async def check_inactivity_and_schedule(guild: discord.Guild, text_channel: disc
             
             users_still_in_vc = [m for m in current_vc.channel.members if not m.bot]
             if len(users_still_in_vc) == 0:
-                # Find a text channel to send goodbye message
-                channel_to_use = text_channel
+                # Try to use stored text_channel first, then provided one, then search
+                channel_to_use = guild_text_channels.get(guild_id) or text_channel
                 if channel_to_use is None:
                     for channel in guild.text_channels:
                         if channel.permissions_for(guild.me).send_messages:
@@ -97,6 +102,10 @@ async def check_inactivity_and_schedule(guild: discord.Guild, text_channel: disc
                     await channel_to_use.send("I've been alone for 5 minutes... I guess nobody wants to listen to me anymore. I'm leaving now, baka!")
                 
                 await current_vc.disconnect()
+                
+                # Clean up stored text channel when disconnecting
+                if guild_id in guild_text_channels:
+                    del guild_text_channels[guild_id]
         except asyncio.CancelledError:
             pass  # Timer was cancelled, normal behavior
         except Exception:
@@ -159,7 +168,7 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                     continue
 
                 source = discord.FFmpegPCMAudio(item['url'], before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5')
-                await text_channel.send(f"Now Playing: {item['title']}")
+                await guild_text_channels[guild.id].send(f"Now Playing: {item['title']}")
                 vc.play(source)
 
                 # Wait for playback to finish without blocking the loop
@@ -396,6 +405,7 @@ async def play(interaction: discord.Interaction, search_or_url: str):
         else:
             url = f"https://www.youtube.com/watch?v={info.get('id', '')}" 
 
+    guild_text_channels[interaction.guild.id] = text_channel
     # Start background player task for this guild if not running
     await start_player_task_if_needed(interaction.guild, voice_client, text_channel)
 
