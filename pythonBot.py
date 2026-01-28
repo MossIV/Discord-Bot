@@ -206,6 +206,7 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                 await text_channel.send(f"Now Playing: {item['title']}")
                 vc.play(source)
 
+                # Wait for playback to finish without blocking the loop
                 while vc.is_playing() or vc.is_paused():
                     await asyncio.sleep(1)
 
