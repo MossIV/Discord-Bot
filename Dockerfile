@@ -40,11 +40,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     
 RUN python -m pip install -U "yt-dlp[default]"
 
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y curl unzip ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Deno
-RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
-RUN chmod +x /usr/local/bin/deno
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh && \
+    chmod +x /usr/local/bin/deno
 # Switch to the non-privileged user to run the application.
 USER appuser
 
