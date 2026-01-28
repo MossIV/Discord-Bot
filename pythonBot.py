@@ -14,8 +14,6 @@ DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 
 import logging
 
-queue = []
-
 # Per-guild async queues and player tasks
 guild_queues = {}
 player_tasks = {}
