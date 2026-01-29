@@ -145,17 +145,26 @@ async def _get_fresh_stream_url(video_id_or_url: str):
     """Extract fresh streaming URL right before playback"""
     def extract():
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio[ext=opus]/bestaudio/best',
             'noplaylist': True,
             'quiet': True,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android', 'web'],
+                    'skip': ['hls']
+                }
+            }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # If it's just an ID, construct the URL
-            if not video_id_or_url.startswith('http'):
-                video_id_or_url = f"https://www.youtube.com/watch?v={video_id_or_url}"
+            url_to_extract = video_id_or_url
             
-            info = ydl.extract_info(video_id_or_url, download=False)
+            # If it's just an ID, construct the URL
+            if not url_to_extract.startswith('http'):
+                url_to_extract = f"https://www.youtube.com/watch?v={url_to_extract}"
+            
+            info = ydl.extract_info(url_to_extract, download=False)
             if '_type' in info and info['_type'] == 'playlist':
                 info = info['entries'][0]
             return info['url']
@@ -199,10 +208,8 @@ async def start_player_task_if_needed(guild: discord.Guild, voice_client: discor
                     await text_channel.send(f"Failed to play: {item.get('title', 'Unknown')} - Could not retrieve stream")
                     continue
 
-                source = discord.FFmpegPCMAudio(
-                    stream_url, 
-                    before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-                )
+                source = discord.FFmpegOpusAudio(stream_url, bitrate=128, before_options='-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', options='-vn')
+                
                 await text_channel.send(f"Now Playing: {item['title']}")
                 vc.play(source)
 
