@@ -37,6 +37,8 @@ RUN adduser \
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=bind,source=requirements.txt,target=requirements.txt \
     python -m pip install -r requirements.txt
+
+RUN pip install --upgrade pip
     
 RUN python -m pip install -U "yt-dlp[default]"
 
