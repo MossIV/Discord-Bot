@@ -1,8 +1,7 @@
 discord.py
 python-dotenv
 requests
-yt-dlp
+--pre "yt-dlp[default]"
 PyNaCl
-ffmpeg
 ffmpeg-python
 davey
